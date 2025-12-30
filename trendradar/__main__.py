@@ -1,9 +1,9 @@
 # coding=utf-8
 """
-TrendRadar 主程序
+TrendRadar Main Program
 
-热点新闻聚合与分析工具
-支持: python -m trendradar
+Trending news aggregation and analysis tool
+Usage: python -m trendradar
 """
 
 import os
@@ -23,7 +23,7 @@ from trendradar.storage import convert_crawl_results_to_news_data
 def check_version_update(
     current_version: str, version_url: str, proxy_url: Optional[str] = None
 ) -> Tuple[bool, Optional[str]]:
-    """检查版本更新"""
+    """Check for version updates"""
     try:
         proxies = None
         if proxy_url:
@@ -41,14 +41,14 @@ def check_version_update(
         response.raise_for_status()
 
         remote_version = response.text.strip()
-        print(f"当前版本: {current_version}, 远程版本: {remote_version}")
+        print(f"Current version: {current_version}, Remote version: {remote_version}")
 
-        # 比较版本
+        # Compare versions
         def parse_version(version_str):
             try:
                 parts = version_str.strip().split(".")
                 if len(parts) != 3:
-                    raise ValueError("版本号格式不正确")
+                    raise ValueError("Invalid version format")
                 return int(parts[0]), int(parts[1]), int(parts[2])
             except:
                 return 0, 0, 0
@@ -60,39 +60,39 @@ def check_version_update(
         return need_update, remote_version if need_update else None
 
     except Exception as e:
-        print(f"版本检查失败: {e}")
+        print(f"Version check failed: {e}")
         return False, None
 
 
-# === 主分析器 ===
+# === Main Analyzer ===
 class NewsAnalyzer:
-    """新闻分析器"""
+    """News Analyzer"""
 
-    # 模式策略定义
+    # Mode strategy definitions
     MODE_STRATEGIES = {
         "incremental": {
-            "mode_name": "增量模式",
-            "description": "增量模式（只关注新增新闻，无新增时不推送）",
-            "realtime_report_type": "实时增量",
-            "summary_report_type": "当日汇总",
+            "mode_name": "Incremental Mode",
+            "description": "Incremental mode (only new news, no push if nothing new)",
+            "realtime_report_type": "Real-time Incremental",
+            "summary_report_type": "Daily Summary",
             "should_send_realtime": True,
             "should_generate_summary": True,
             "summary_mode": "daily",
         },
         "current": {
-            "mode_name": "当前榜单模式",
-            "description": "当前榜单模式（当前榜单匹配新闻 + 新增新闻区域 + 按时推送）",
-            "realtime_report_type": "实时当前榜单",
-            "summary_report_type": "当前榜单汇总",
+            "mode_name": "Current Rankings Mode",
+            "description": "Current rankings mode (current matches + new news section + scheduled push)",
+            "realtime_report_type": "Real-time Current Rankings",
+            "summary_report_type": "Current Rankings Summary",
             "should_send_realtime": True,
             "should_generate_summary": True,
             "summary_mode": "current",
         },
         "daily": {
-            "mode_name": "当日汇总模式",
-            "description": "当日汇总模式（所有匹配新闻 + 新增新闻区域 + 按时推送）",
+            "mode_name": "Daily Summary Mode",
+            "description": "Daily summary mode (all matches + new news section + scheduled push)",
             "realtime_report_type": "",
-            "summary_report_type": "当日汇总",
+            "summary_report_type": "Daily Summary",
             "should_send_realtime": False,
             "should_generate_summary": True,
             "summary_mode": "daily",
@@ -100,12 +100,12 @@ class NewsAnalyzer:
     }
 
     def __init__(self):
-        # 加载配置
-        print("正在加载配置...")
+        # Load configuration
+        print("Loading configuration...")
         config = load_config()
-        print(f"TrendRadar v{__version__} 配置加载完成")
-        print(f"监控平台数量: {len(config['PLATFORMS'])}")
-        print(f"时区: {config.get('TIMEZONE', 'Asia/Shanghai')}")
+        print(f"TrendRadar v{__version__} configuration loaded")
+        print(f"Monitored platforms: {len(config['PLATFORMS'])}")
+        print(f"Timezone: {config.get('TIMEZONE', 'America/New_York')}")
 
         # 创建应用上下文
         self.ctx = AppContext(config)
@@ -127,22 +127,22 @@ class NewsAnalyzer:
             self._check_version_update()
 
     def _init_storage_manager(self) -> None:
-        """初始化存储管理器（使用 AppContext）"""
-        # 获取数据保留天数（支持环境变量覆盖）
+        """Initialize storage manager (using AppContext)"""
+        # Get data retention days (supports environment variable override)
         env_retention = os.environ.get("STORAGE_RETENTION_DAYS", "").strip()
         if env_retention:
-            # 环境变量覆盖配置
+            # Environment variable overrides config
             self.ctx.config["STORAGE"]["RETENTION_DAYS"] = int(env_retention)
 
         self.storage_manager = self.ctx.get_storage_manager()
-        print(f"存储后端: {self.storage_manager.backend_name}")
+        print(f"Storage backend: {self.storage_manager.backend_name}")
 
         retention_days = self.ctx.config.get("STORAGE", {}).get("RETENTION_DAYS", 0)
         if retention_days > 0:
-            print(f"数据保留天数: {retention_days} 天")
+            print(f"Data retention: {retention_days} days")
 
     def _detect_docker_environment(self) -> bool:
-        """检测是否运行在 Docker 容器中"""
+        """Detect if running in Docker container"""
         try:
             if os.environ.get("DOCKER_CONTAINER") == "true":
                 return True
@@ -155,21 +155,21 @@ class NewsAnalyzer:
             return False
 
     def _should_open_browser(self) -> bool:
-        """判断是否应该打开浏览器"""
+        """Determine if browser should be opened"""
         return not self.is_github_actions and not self.is_docker_container
 
     def _setup_proxy(self) -> None:
-        """设置代理配置"""
+        """Set up proxy configuration"""
         if not self.is_github_actions and self.ctx.config["USE_PROXY"]:
             self.proxy_url = self.ctx.config["DEFAULT_PROXY"]
-            print("本地环境，使用代理")
+            print("Local environment, using proxy")
         elif not self.is_github_actions and not self.ctx.config["USE_PROXY"]:
-            print("本地环境，未启用代理")
+            print("Local environment, proxy disabled")
         else:
-            print("GitHub Actions环境，不使用代理")
+            print("GitHub Actions environment, proxy disabled")
 
     def _check_version_update(self) -> None:
-        """检查版本更新"""
+        """Check for version updates"""
         try:
             need_update, remote_version = check_version_update(
                 __version__, self.ctx.config["VERSION_CHECK_URL"], self.proxy_url
@@ -180,18 +180,18 @@ class NewsAnalyzer:
                     "current_version": __version__,
                     "remote_version": remote_version,
                 }
-                print(f"发现新版本: {remote_version} (当前: {__version__})")
+                print(f"New version available: {remote_version} (current: {__version__})")
             else:
-                print("版本检查完成，当前为最新版本")
+                print("Version check complete, you have the latest version")
         except Exception as e:
-            print(f"版本检查出错: {e}")
+            print(f"Version check error: {e}")
 
     def _get_mode_strategy(self) -> Dict:
-        """获取当前模式的策略配置"""
+        """Get current mode strategy configuration"""
         return self.MODE_STRATEGIES.get(self.report_mode, self.MODE_STRATEGIES["daily"])
 
     def _has_notification_configured(self) -> bool:
-        """检查是否配置了任何通知渠道"""
+        """Check if any notification channel is configured"""
         cfg = self.ctx.config
         return any(
             [
@@ -213,19 +213,19 @@ class NewsAnalyzer:
     def _has_valid_content(
         self, stats: List[Dict], new_titles: Optional[Dict] = None
     ) -> bool:
-        """检查是否有有效的新闻内容"""
+        """Check if there is valid news content"""
         if self.report_mode == "incremental":
-            # 增量模式：必须有新增标题且匹配了关键词才推送
+            # Incremental mode: must have new titles matching keywords
             has_new_titles = bool(
                 new_titles and any(len(titles) > 0 for titles in new_titles.values())
             )
             has_matched_news = any(stat["count"] > 0 for stat in stats)
             return has_new_titles and has_matched_news
         elif self.report_mode == "current":
-            # current模式：只要stats有内容就说明有匹配的新闻
+            # Current mode: push if stats has any matched content
             return any(stat["count"] > 0 for stat in stats)
         else:
-            # 当日汇总模式下，检查是否有匹配的频率词新闻或新增新闻
+            # Daily summary mode: check for matched keywords or new news
             has_matched_news = any(stat["count"] > 0 for stat in stats)
             has_new_news = bool(
                 new_titles and any(len(titles) > 0 for titles in new_titles.values())
@@ -236,24 +236,24 @@ class NewsAnalyzer:
         self,
         quiet: bool = False,
     ) -> Optional[Tuple[Dict, Dict, Dict, Dict, List, List]]:
-        """统一的数据加载和预处理，使用当前监控平台列表过滤历史数据"""
+        """Unified data loading and preprocessing, filtered by current platform list"""
         try:
-            # 获取当前配置的监控平台ID列表
+            # Get current configured platform IDs
             current_platform_ids = self.ctx.platform_ids
             if not quiet:
-                print(f"当前监控平台: {current_platform_ids}")
+                print(f"Current platforms: {current_platform_ids}")
 
             all_results, id_to_name, title_info = self.ctx.read_today_titles(
                 current_platform_ids, quiet=quiet
             )
 
             if not all_results:
-                print("没有找到当天的数据")
+                print("No data found for today")
                 return None
 
             total_titles = sum(len(titles) for titles in all_results.values())
             if not quiet:
-                print(f"读取到 {total_titles} 个标题（已按当前监控平台过滤）")
+                print(f"Loaded {total_titles} titles (filtered by current platforms)")
 
             new_titles = self.ctx.detect_new_titles(current_platform_ids, quiet=quiet)
             word_groups, filter_words, global_filters = self.ctx.load_frequency_words()
@@ -268,11 +268,11 @@ class NewsAnalyzer:
                 global_filters,
             )
         except Exception as e:
-            print(f"数据加载失败: {e}")
+            print(f"Data loading failed: {e}")
             return None
 
     def _prepare_current_title_info(self, results: Dict, time_info: str) -> Dict:
-        """从当前抓取结果构建标题信息"""
+        """Build title info from current crawl results"""
         title_info = {}
         for source_id, titles_data in results.items():
             title_info[source_id] = {}
@@ -305,9 +305,9 @@ class NewsAnalyzer:
         global_filters: Optional[List[str]] = None,
         quiet: bool = False,
     ) -> Tuple[List[Dict], Optional[str]]:
-        """统一的分析流水线：数据处理 → 统计计算 → HTML生成"""
+        """Unified analysis pipeline: data processing → statistics → HTML generation"""
 
-        # 统计计算（使用 AppContext）
+        # Calculate statistics (using AppContext)
         stats, total_titles = self.ctx.count_frequency(
             data_source,
             word_groups,
@@ -320,7 +320,7 @@ class NewsAnalyzer:
             quiet=quiet,
         )
 
-        # HTML生成（如果启用）
+        # Generate HTML (if enabled)
         html_file = None
         if self.ctx.config["STORAGE"]["FORMATS"]["HTML"]:
             html_file = self.ctx.generate_html(
@@ -346,7 +346,7 @@ class NewsAnalyzer:
         id_to_name: Optional[Dict] = None,
         html_file_path: Optional[str] = None,
     ) -> bool:
-        """统一的通知发送逻辑，包含所有判断条件"""
+        """Unified notification sending logic with all conditions"""
         has_notification = self._has_notification_configured()
         cfg = self.ctx.config
 
@@ -355,7 +355,7 @@ class NewsAnalyzer:
             and has_notification
             and self._has_valid_content(stats, new_titles)
         ):
-            # 推送窗口控制
+            # Push window control
             if cfg["PUSH_WINDOW"]["ENABLED"]:
                 push_manager = self.ctx.create_push_manager()
                 time_range_start = cfg["PUSH_WINDOW"]["TIME_RANGE"]["START"]
@@ -364,24 +364,24 @@ class NewsAnalyzer:
                 if not push_manager.is_in_time_range(time_range_start, time_range_end):
                     now = self.ctx.get_time()
                     print(
-                        f"推送窗口控制：当前时间 {now.strftime('%H:%M')} 不在推送时间窗口 {time_range_start}-{time_range_end} 内，跳过推送"
+                        f"Push window control: Current time {now.strftime('%H:%M')} is outside push window {time_range_start}-{time_range_end}, skipping"
                     )
                     return False
 
                 if cfg["PUSH_WINDOW"]["ONCE_PER_DAY"]:
                     if push_manager.has_pushed_today():
-                        print(f"推送窗口控制：今天已推送过，跳过本次推送")
+                        print(f"Push window control: Already pushed today, skipping")
                         return False
                     else:
-                        print(f"推送窗口控制：今天首次推送")
+                        print(f"Push window control: First push today")
 
-            # 准备报告数据
+            # Prepare report data
             report_data = self.ctx.prepare_report(stats, failed_ids, new_titles, id_to_name, mode)
 
-            # 是否发送版本更新信息
+            # Whether to send version update info
             update_info_to_send = self.update_info if cfg["SHOW_VERSION_UPDATE"] else None
 
-            # 使用 NotificationDispatcher 发送到所有渠道
+            # Use NotificationDispatcher to send to all channels
             dispatcher = self.ctx.create_notification_dispatcher()
             results = dispatcher.dispatch_all(
                 report_data=report_data,
@@ -393,10 +393,10 @@ class NewsAnalyzer:
             )
 
             if not results:
-                print("未配置任何通知渠道，跳过通知发送")
+                print("No notification channels configured, skipping")
                 return False
 
-            # 如果成功发送了任何通知，且启用了每天只推一次，则记录推送
+            # Record push if successful and once_per_day is enabled
             if (
                 cfg["PUSH_WINDOW"]["ENABLED"]
                 and cfg["PUSH_WINDOW"]["ONCE_PER_DAY"]
@@ -408,43 +408,43 @@ class NewsAnalyzer:
             return True
 
         elif cfg["ENABLE_NOTIFICATION"] and not has_notification:
-            print("⚠️ 警告：通知功能已启用但未配置任何通知渠道，将跳过通知发送")
+            print("⚠️ Warning: Notifications enabled but no channels configured, skipping")
         elif not cfg["ENABLE_NOTIFICATION"]:
-            print(f"跳过{report_type}通知：通知功能已禁用")
+            print(f"Skipping {report_type} notification: Notifications disabled")
         elif (
             cfg["ENABLE_NOTIFICATION"]
             and has_notification
             and not self._has_valid_content(stats, new_titles)
         ):
             mode_strategy = self._get_mode_strategy()
-            if "实时" in report_type:
+            if "Real-time" in report_type or "实时" in report_type:
                 if self.report_mode == "incremental":
                     has_new = bool(
                         new_titles and any(len(titles) > 0 for titles in new_titles.values())
                     )
                     if not has_new:
-                        print("跳过实时推送通知：增量模式下未检测到新增的新闻")
+                        print("Skipping real-time notification: No new news detected in incremental mode")
                     else:
-                        print("跳过实时推送通知：增量模式下新增新闻未匹配到关键词")
+                        print("Skipping real-time notification: New news didn't match any keywords")
                 else:
                     print(
-                        f"跳过实时推送通知：{mode_strategy['mode_name']}下未检测到匹配的新闻"
+                        f"Skipping real-time notification: No matched news in {mode_strategy['mode_name']}"
                     )
             else:
                 print(
-                    f"跳过{mode_strategy['summary_report_type']}通知：未匹配到有效的新闻内容"
+                    f"Skipping {mode_strategy['summary_report_type']} notification: No valid news content"
                 )
 
         return False
 
     def _generate_summary_report(self, mode_strategy: Dict) -> Optional[str]:
-        """生成汇总报告（带通知）"""
+        """Generate summary report (with notification)"""
         summary_type = (
-            "当前榜单汇总" if mode_strategy["summary_mode"] == "current" else "当日汇总"
+            "Current Rankings Summary" if mode_strategy["summary_mode"] == "current" else "Daily Summary"
         )
-        print(f"生成{summary_type}报告...")
+        print(f"Generating {summary_type} report...")
 
-        # 加载分析数据
+        # Load analysis data
         analysis_data = self._load_analysis_data()
         if not analysis_data:
             return None
@@ -453,7 +453,7 @@ class NewsAnalyzer:
             analysis_data
         )
 
-        # 运行分析流水线
+        # Run analysis pipeline
         stats, html_file = self._run_analysis_pipeline(
             all_results,
             mode_strategy["summary_mode"],
@@ -467,9 +467,9 @@ class NewsAnalyzer:
         )
 
         if html_file:
-            print(f"{summary_type}报告已生成: {html_file}")
+            print(f"{summary_type} report generated: {html_file}")
 
-        # 发送通知
+        # Send notification
         self._send_notification_if_needed(
             stats,
             mode_strategy["summary_report_type"],
@@ -483,11 +483,11 @@ class NewsAnalyzer:
         return html_file
 
     def _generate_summary_html(self, mode: str = "daily") -> Optional[str]:
-        """生成汇总HTML"""
-        summary_type = "当前榜单汇总" if mode == "current" else "当日汇总"
-        print(f"生成{summary_type}HTML...")
+        """Generate summary HTML"""
+        summary_type = "Current Rankings Summary" if mode == "current" else "Daily Summary"
+        print(f"Generating {summary_type} HTML...")
 
-        # 加载分析数据（静默模式，避免重复输出日志）
+        # Load analysis data (quiet mode to avoid duplicate logs)
         analysis_data = self._load_analysis_data(quiet=True)
         if not analysis_data:
             return None
@@ -496,7 +496,7 @@ class NewsAnalyzer:
             analysis_data
         )
 
-        # 运行分析流水线（静默模式，避免重复输出日志）
+        # Run analysis pipeline (quiet mode)
         _, html_file = self._run_analysis_pipeline(
             all_results,
             mode,
@@ -511,32 +511,32 @@ class NewsAnalyzer:
         )
 
         if html_file:
-            print(f"{summary_type}HTML已生成: {html_file}")
+            print(f"{summary_type} HTML generated: {html_file}")
         return html_file
 
     def _initialize_and_check_config(self) -> None:
-        """通用初始化和配置检查"""
+        """Common initialization and config check"""
         now = self.ctx.get_time()
-        print(f"当前北京时间: {now.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"Current time: {now.strftime('%Y-%m-%d %H:%M:%S')}")
 
         if not self.ctx.config["ENABLE_CRAWLER"]:
-            print("爬虫功能已禁用（ENABLE_CRAWLER=False），程序退出")
+            print("Crawler disabled (ENABLE_CRAWLER=False), exiting")
             return
 
         has_notification = self._has_notification_configured()
         if not self.ctx.config["ENABLE_NOTIFICATION"]:
-            print("通知功能已禁用（ENABLE_NOTIFICATION=False），将只进行数据抓取")
+            print("Notifications disabled (ENABLE_NOTIFICATION=False), data crawling only")
         elif not has_notification:
-            print("未配置任何通知渠道，将只进行数据抓取，不发送通知")
+            print("No notification channels configured, data crawling only")
         else:
-            print("通知功能已启用，将发送通知")
+            print("Notifications enabled, will send alerts")
 
         mode_strategy = self._get_mode_strategy()
-        print(f"报告模式: {self.report_mode}")
-        print(f"运行模式: {mode_strategy['description']}")
+        print(f"Report mode: {self.report_mode}")
+        print(f"Run mode: {mode_strategy['description']}")
 
     def _crawl_data(self) -> Tuple[Dict, Dict, List]:
-        """执行数据爬取"""
+        """Execute data crawling"""
         ids = []
         for platform in self.ctx.platforms:
             if "name" in platform:
@@ -545,43 +545,43 @@ class NewsAnalyzer:
                 ids.append(platform["id"])
 
         print(
-            f"配置的监控平台: {[p.get('name', p['id']) for p in self.ctx.platforms]}"
+            f"Configured platforms: {[p.get('name', p['id']) for p in self.ctx.platforms]}"
         )
-        print(f"开始爬取数据，请求间隔 {self.request_interval} 毫秒")
+        print(f"Starting data crawl, request interval {self.request_interval}ms")
         Path("output").mkdir(parents=True, exist_ok=True)
 
         results, id_to_name, failed_ids = self.data_fetcher.crawl_websites(
             ids, self.request_interval
         )
 
-        # 转换为 NewsData 格式并保存到存储后端
+        # Convert to NewsData format and save to storage backend
         crawl_time = self.ctx.format_time()
         crawl_date = self.ctx.format_date()
         news_data = convert_crawl_results_to_news_data(
             results, id_to_name, failed_ids, crawl_time, crawl_date
         )
 
-        # 保存到存储后端（SQLite）
+        # Save to storage backend (SQLite)
         if self.storage_manager.save_news_data(news_data):
-            print(f"数据已保存到存储后端: {self.storage_manager.backend_name}")
+            print(f"Data saved to storage backend: {self.storage_manager.backend_name}")
 
-        # 保存 TXT 快照（如果启用）
+        # Save TXT snapshot (if enabled)
         txt_file = self.storage_manager.save_txt_snapshot(news_data)
         if txt_file:
-            print(f"TXT 快照已保存: {txt_file}")
+            print(f"TXT snapshot saved: {txt_file}")
 
-        # 兼容：同时保存到原有 TXT 格式（确保向后兼容）
+        # Compatibility: also save to original TXT format
         if self.ctx.config["STORAGE"]["FORMATS"]["TXT"]:
             title_file = self.ctx.save_titles(results, id_to_name, failed_ids)
-            print(f"标题已保存到: {title_file}")
+            print(f"Titles saved to: {title_file}")
 
         return results, id_to_name, failed_ids
 
     def _execute_mode_strategy(
         self, mode_strategy: Dict, results: Dict, id_to_name: Dict, failed_ids: List
     ) -> Optional[str]:
-        """执行模式特定逻辑"""
-        # 获取当前监控平台ID列表
+        """Execute mode-specific logic"""
+        # Get current platform IDs
         current_platform_ids = self.ctx.platform_ids
 
         new_titles = self.ctx.detect_new_titles(current_platform_ids)
@@ -590,9 +590,9 @@ class NewsAnalyzer:
             self.ctx.save_titles(results, id_to_name, failed_ids)
         word_groups, filter_words, global_filters = self.ctx.load_frequency_words()
 
-        # current模式下，实时推送需要使用完整的历史数据来保证统计信息的完整性
+        # In current mode, real-time push needs full historical data for complete statistics
         if self.report_mode == "current":
-            # 加载完整的历史数据（已按当前平台过滤）
+            # Load full historical data (filtered by current platforms)
             analysis_data = self._load_analysis_data()
             if analysis_data:
                 (
@@ -606,7 +606,7 @@ class NewsAnalyzer:
                 ) = analysis_data
 
                 print(
-                    f"current模式：使用过滤后的历史数据，包含平台：{list(all_results.keys())}"
+                    f"Current mode: Using filtered historical data, platforms: {list(all_results.keys())}"
                 )
 
                 stats, html_file = self._run_analysis_pipeline(
@@ -624,9 +624,9 @@ class NewsAnalyzer:
                 combined_id_to_name = {**historical_id_to_name, **id_to_name}
 
                 if html_file:
-                    print(f"HTML报告已生成: {html_file}")
+                    print(f"HTML report generated: {html_file}")
 
-                # 发送实时通知（使用完整历史数据的统计结果）
+                # Send real-time notification (using full historical statistics)
                 summary_html = None
                 if mode_strategy["should_send_realtime"]:
                     self._send_notification_if_needed(
@@ -639,8 +639,8 @@ class NewsAnalyzer:
                         html_file_path=html_file,
                     )
             else:
-                print("❌ 严重错误：无法读取刚保存的数据文件")
-                raise RuntimeError("数据一致性检查失败：保存后立即读取失败")
+                print("❌ Critical error: Unable to read just-saved data file")
+                raise RuntimeError("Data consistency check failed: read failed after save")
         else:
             title_info = self._prepare_current_title_info(results, time_info)
             stats, html_file = self._run_analysis_pipeline(
@@ -655,9 +655,9 @@ class NewsAnalyzer:
                 global_filters=global_filters,
             )
             if html_file:
-                print(f"HTML报告已生成: {html_file}")
+                print(f"HTML report generated: {html_file}")
 
-            # 发送实时通知（如果需要）
+            # Send real-time notification (if needed)
             summary_html = None
             if mode_strategy["should_send_realtime"]:
                 self._send_notification_if_needed(
@@ -670,38 +670,38 @@ class NewsAnalyzer:
                     html_file_path=html_file,
                 )
 
-        # 生成汇总报告（如果需要）
+        # Generate summary report (if needed)
         summary_html = None
         if mode_strategy["should_generate_summary"]:
             if mode_strategy["should_send_realtime"]:
-                # 如果已经发送了实时通知，汇总只生成HTML不发送通知
+                # If real-time notification sent, summary only generates HTML
                 summary_html = self._generate_summary_html(
                     mode_strategy["summary_mode"]
                 )
             else:
-                # daily模式：直接生成汇总报告并发送通知
+                # Daily mode: generate summary report with notification
                 summary_html = self._generate_summary_report(mode_strategy)
 
-        # 打开浏览器（仅在非容器环境）
+        # Open browser (only in non-container environment)
         if self._should_open_browser() and html_file:
             if summary_html:
                 summary_url = "file://" + str(Path(summary_html).resolve())
-                print(f"正在打开汇总报告: {summary_url}")
+                print(f"Opening summary report: {summary_url}")
                 webbrowser.open(summary_url)
             else:
                 file_url = "file://" + str(Path(html_file).resolve())
-                print(f"正在打开HTML报告: {file_url}")
+                print(f"Opening HTML report: {file_url}")
                 webbrowser.open(file_url)
         elif self.is_docker_container and html_file:
             if summary_html:
-                print(f"汇总报告已生成（Docker环境）: {summary_html}")
+                print(f"Summary report generated (Docker): {summary_html}")
             else:
-                print(f"HTML报告已生成（Docker环境）: {html_file}")
+                print(f"HTML report generated (Docker): {html_file}")
 
         return summary_html
 
     def run(self) -> None:
-        """执行分析流程"""
+        """Execute analysis workflow"""
         try:
             self._initialize_and_check_config()
 
@@ -712,26 +712,26 @@ class NewsAnalyzer:
             self._execute_mode_strategy(mode_strategy, results, id_to_name, failed_ids)
 
         except Exception as e:
-            print(f"分析流程执行出错: {e}")
+            print(f"Analysis workflow error: {e}")
             raise
         finally:
-            # 清理资源（包括过期数据清理和数据库连接关闭）
+            # Cleanup resources (including expired data and database connections)
             self.ctx.cleanup()
 
 
 def main():
-    """主程序入口"""
+    """Main program entry point"""
     try:
         analyzer = NewsAnalyzer()
         analyzer.run()
     except FileNotFoundError as e:
-        print(f"❌ 配置文件错误: {e}")
-        print("\n请确保以下文件存在:")
+        print(f"❌ Config file error: {e}")
+        print("\nPlease ensure these files exist:")
         print("  • config/config.yaml")
         print("  • config/frequency_words.txt")
-        print("\n参考项目文档进行正确配置")
+        print("\nRefer to project documentation for setup")
     except Exception as e:
-        print(f"❌ 程序运行错误: {e}")
+        print(f"❌ Program error: {e}")
         raise
 
 

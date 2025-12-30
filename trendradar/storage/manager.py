@@ -1,8 +1,8 @@
 # coding=utf-8
 """
-存储管理器 - 统一管理存储后端
+Storage Manager - Unified storage backend management
 
-根据环境和配置自动选择合适的存储后端
+Automatically selects appropriate storage backend based on environment and config
 """
 
 import os
@@ -11,19 +11,19 @@ from typing import Optional
 from trendradar.storage.base import StorageBackend, NewsData
 
 
-# 存储管理器单例
+# Storage manager singleton
 _storage_manager: Optional["StorageManager"] = None
 
 
 class StorageManager:
     """
-    存储管理器
+    Storage Manager
 
-    功能：
-    - 自动检测运行环境（GitHub Actions / Docker / 本地）
-    - 根据配置选择存储后端（local / remote / auto）
-    - 提供统一的存储接口
-    - 支持从远程拉取数据到本地
+    Features:
+    - Auto-detect runtime environment (GitHub Actions / Docker / Local)
+    - Select storage backend based on config (local / remote / auto)
+    - Provide unified storage interface
+    - Support pulling data from remote to local
     """
 
     def __init__(
@@ -37,22 +37,22 @@ class StorageManager:
         remote_retention_days: int = 0,
         pull_enabled: bool = False,
         pull_days: int = 0,
-        timezone: str = "Asia/Shanghai",
+        timezone: str = "America/New_York",
     ):
         """
-        初始化存储管理器
+        Initialize storage manager
 
         Args:
-            backend_type: 存储后端类型 (local / remote / auto)
-            data_dir: 本地数据目录
-            enable_txt: 是否启用 TXT 快照
-            enable_html: 是否启用 HTML 报告
-            remote_config: 远程存储配置（endpoint_url, bucket_name, access_key_id 等）
-            local_retention_days: 本地数据保留天数（0 = 无限制）
-            remote_retention_days: 远程数据保留天数（0 = 无限制）
-            pull_enabled: 是否启用启动时自动拉取
-            pull_days: 拉取最近 N 天的数据
-            timezone: 时区配置（默认 Asia/Shanghai）
+            backend_type: Storage backend type (local / remote / auto)
+            data_dir: Local data directory
+            enable_txt: Enable TXT snapshots
+            enable_html: Enable HTML reports
+            remote_config: Remote storage config (endpoint_url, bucket_name, access_key_id, etc.)
+            local_retention_days: Local data retention days (0 = unlimited)
+            remote_retention_days: Remote data retention days (0 = unlimited)
+            pull_enabled: Enable auto-pull on startup
+            pull_days: Pull last N days of data
+            timezone: Timezone config (default: America/New_York)
         """
         self.backend_type = backend_type
         self.data_dir = data_dir
@@ -70,61 +70,61 @@ class StorageManager:
 
     @staticmethod
     def is_github_actions() -> bool:
-        """检测是否在 GitHub Actions 环境中运行"""
+        """Detect if running in GitHub Actions environment"""
         return os.environ.get("GITHUB_ACTIONS") == "true"
 
     @staticmethod
     def is_docker() -> bool:
-        """检测是否在 Docker 容器中运行"""
-        # 方法1: 检查 /.dockerenv 文件
+        """Detect if running in Docker container"""
+        # Method 1: Check /.dockerenv file
         if os.path.exists("/.dockerenv"):
             return True
 
-        # 方法2: 检查 cgroup（Linux）
+        # Method 2: Check cgroup (Linux)
         try:
             with open("/proc/1/cgroup", "r") as f:
                 return "docker" in f.read()
         except (FileNotFoundError, PermissionError):
             pass
 
-        # 方法3: 检查环境变量
+        # Method 3: Check environment variable
         return os.environ.get("DOCKER_CONTAINER") == "true"
 
     def _resolve_backend_type(self) -> str:
-        """解析实际使用的后端类型"""
+        """Resolve actual backend type to use"""
         if self.backend_type == "auto":
             if self.is_github_actions():
-                # GitHub Actions 环境，检查是否配置了远程存储
+                # GitHub Actions environment, check for remote storage config
                 if self._has_remote_config():
                     return "remote"
                 else:
-                    print("[存储管理器] GitHub Actions 环境但未配置远程存储，使用本地存储")
+                    print("[Storage Manager] GitHub Actions but no remote storage configured, using local")
                     return "local"
             else:
                 return "local"
         return self.backend_type
 
     def _has_remote_config(self) -> bool:
-        """检查是否有有效的远程存储配置"""
-        # 检查配置或环境变量
+        """Check if valid remote storage config exists"""
+        # Check config or environment variables
         bucket_name = self.remote_config.get("bucket_name") or os.environ.get("S3_BUCKET_NAME")
         access_key = self.remote_config.get("access_key_id") or os.environ.get("S3_ACCESS_KEY_ID")
         secret_key = self.remote_config.get("secret_access_key") or os.environ.get("S3_SECRET_ACCESS_KEY")
         endpoint = self.remote_config.get("endpoint_url") or os.environ.get("S3_ENDPOINT_URL")
 
-        # 调试日志
+        # Debug logging
         has_config = bool(bucket_name and access_key and secret_key and endpoint)
         if not has_config:
-            print(f"[存储管理器] 远程存储配置检查失败:")
-            print(f"  - bucket_name: {'已配置' if bucket_name else '未配置'}")
-            print(f"  - access_key_id: {'已配置' if access_key else '未配置'}")
-            print(f"  - secret_access_key: {'已配置' if secret_key else '未配置'}")
-            print(f"  - endpoint_url: {'已配置' if endpoint else '未配置'}")
+            print(f"[Storage Manager] Remote storage config check failed:")
+            print(f"  - bucket_name: {'configured' if bucket_name else 'not configured'}")
+            print(f"  - access_key_id: {'configured' if access_key else 'not configured'}")
+            print(f"  - secret_access_key: {'configured' if secret_key else 'not configured'}")
+            print(f"  - endpoint_url: {'configured' if endpoint else 'not configured'}")
 
         return has_config
 
     def _create_remote_backend(self) -> Optional[StorageBackend]:
-        """创建远程存储后端"""
+        """Create remote storage backend"""
         try:
             from trendradar.storage.remote import RemoteStorageBackend
 
@@ -139,24 +139,24 @@ class StorageManager:
                 timezone=self.timezone,
             )
         except ImportError as e:
-            print(f"[存储管理器] 远程后端导入失败: {e}")
-            print("[存储管理器] 请确保已安装 boto3: pip install boto3")
+            print(f"[Storage Manager] Remote backend import failed: {e}")
+            print("[Storage Manager] Please ensure boto3 is installed: pip install boto3")
             return None
         except Exception as e:
-            print(f"[存储管理器] 远程后端初始化失败: {e}")
+            print(f"[Storage Manager] Remote backend initialization failed: {e}")
             return None
 
     def get_backend(self) -> StorageBackend:
-        """获取存储后端实例"""
+        """Get storage backend instance"""
         if self._backend is None:
             resolved_type = self._resolve_backend_type()
 
             if resolved_type == "remote":
                 self._backend = self._create_remote_backend()
                 if self._backend:
-                    print(f"[存储管理器] 使用远程存储后端")
+                    print(f"[Storage Manager] Using remote storage backend")
                 else:
-                    print("[存储管理器] 回退到本地存储")
+                    print("[Storage Manager] Falling back to local storage")
                     resolved_type = "local"
 
             if resolved_type == "local" or self._backend is None:
@@ -168,65 +168,65 @@ class StorageManager:
                     enable_html=self.enable_html,
                     timezone=self.timezone,
                 )
-                print(f"[存储管理器] 使用本地存储后端 (数据目录: {self.data_dir})")
+                print(f"[Storage Manager] Using local storage backend (data dir: {self.data_dir})")
 
         return self._backend
 
     def pull_from_remote(self) -> int:
         """
-        从远程拉取数据到本地
+        Pull data from remote to local
 
         Returns:
-            成功拉取的文件数量
+            Number of files successfully pulled
         """
         if not self.pull_enabled or self.pull_days <= 0:
             return 0
 
         if not self._has_remote_config():
-            print("[存储管理器] 未配置远程存储，无法拉取")
+            print("[Storage Manager] Remote storage not configured, cannot pull")
             return 0
 
-        # 创建远程后端（如果还没有）
+        # Create remote backend if not exists
         if self._remote_backend is None:
             self._remote_backend = self._create_remote_backend()
 
         if self._remote_backend is None:
-            print("[存储管理器] 无法创建远程后端，拉取失败")
+            print("[Storage Manager] Cannot create remote backend, pull failed")
             return 0
 
-        # 调用拉取方法
+        # Call pull method
         return self._remote_backend.pull_recent_days(self.pull_days, self.data_dir)
 
     def save_news_data(self, data: NewsData) -> bool:
-        """保存新闻数据"""
+        """Save news data"""
         return self.get_backend().save_news_data(data)
 
     def get_today_all_data(self, date: Optional[str] = None) -> Optional[NewsData]:
-        """获取当天所有数据"""
+        """Get all data for today"""
         return self.get_backend().get_today_all_data(date)
 
     def get_latest_crawl_data(self, date: Optional[str] = None) -> Optional[NewsData]:
-        """获取最新抓取数据"""
+        """Get latest crawl data"""
         return self.get_backend().get_latest_crawl_data(date)
 
     def detect_new_titles(self, current_data: NewsData) -> dict:
-        """检测新增标题"""
+        """Detect new titles"""
         return self.get_backend().detect_new_titles(current_data)
 
     def save_txt_snapshot(self, data: NewsData) -> Optional[str]:
-        """保存 TXT 快照"""
+        """Save TXT snapshot"""
         return self.get_backend().save_txt_snapshot(data)
 
     def save_html_report(self, html_content: str, filename: str, is_summary: bool = False) -> Optional[str]:
-        """保存 HTML 报告"""
+        """Save HTML report"""
         return self.get_backend().save_html_report(html_content, filename, is_summary)
 
     def is_first_crawl_today(self, date: Optional[str] = None) -> bool:
-        """检查是否是当天第一次抓取"""
+        """Check if this is first crawl today"""
         return self.get_backend().is_first_crawl_today(date)
 
     def cleanup(self) -> None:
-        """清理资源"""
+        """Cleanup resources"""
         if self._backend:
             self._backend.cleanup()
         if self._remote_backend:
@@ -234,18 +234,18 @@ class StorageManager:
 
     def cleanup_old_data(self) -> int:
         """
-        清理过期数据
+        Cleanup expired data
 
         Returns:
-            删除的日期目录数量
+            Number of deleted date directories
         """
         total_deleted = 0
 
-        # 清理本地数据
+        # Cleanup local data
         if self.local_retention_days > 0:
             total_deleted += self.get_backend().cleanup_old_data(self.local_retention_days)
 
-        # 清理远程数据（如果配置了）
+        # Cleanup remote data (if configured)
         if self.remote_retention_days > 0 and self._has_remote_config():
             if self._remote_backend is None:
                 self._remote_backend = self._create_remote_backend()
@@ -256,38 +256,38 @@ class StorageManager:
 
     @property
     def backend_name(self) -> str:
-        """获取当前后端名称"""
+        """Get current backend name"""
         return self.get_backend().backend_name
 
     @property
     def supports_txt(self) -> bool:
-        """是否支持 TXT 快照"""
+        """Whether TXT snapshots are supported"""
         return self.get_backend().supports_txt
 
-    # === 推送记录相关方法 ===
+    # === Push record methods ===
 
     def has_pushed_today(self, date: Optional[str] = None) -> bool:
         """
-        检查指定日期是否已推送过
+        Check if push was sent for specified date
 
         Args:
-            date: 日期字符串（YYYY-MM-DD），默认为今天
+            date: Date string (YYYY-MM-DD), defaults to today
 
         Returns:
-            是否已推送
+            Whether push was sent
         """
         return self.get_backend().has_pushed_today(date)
 
     def record_push(self, report_type: str, date: Optional[str] = None) -> bool:
         """
-        记录推送
+        Record a push
 
         Args:
-            report_type: 报告类型
-            date: 日期字符串（YYYY-MM-DD），默认为今天
+            report_type: Report type
+            date: Date string (YYYY-MM-DD), defaults to today
 
         Returns:
-            是否记录成功
+            Whether record was successful
         """
         return self.get_backend().record_push(report_type, date)
 
@@ -302,27 +302,27 @@ def get_storage_manager(
     remote_retention_days: int = 0,
     pull_enabled: bool = False,
     pull_days: int = 0,
-    timezone: str = "Asia/Shanghai",
+    timezone: str = "America/New_York",
     force_new: bool = False,
 ) -> StorageManager:
     """
-    获取存储管理器单例
+    Get storage manager singleton
 
     Args:
-        backend_type: 存储后端类型
-        data_dir: 本地数据目录
-        enable_txt: 是否启用 TXT 快照
-        enable_html: 是否启用 HTML 报告
-        remote_config: 远程存储配置
-        local_retention_days: 本地数据保留天数（0 = 无限制）
-        remote_retention_days: 远程数据保留天数（0 = 无限制）
-        pull_enabled: 是否启用启动时自动拉取
-        pull_days: 拉取最近 N 天的数据
-        timezone: 时区配置（默认 Asia/Shanghai）
-        force_new: 是否强制创建新实例
+        backend_type: Storage backend type
+        data_dir: Local data directory
+        enable_txt: Enable TXT snapshots
+        enable_html: Enable HTML reports
+        remote_config: Remote storage config
+        local_retention_days: Local data retention days (0 = unlimited)
+        remote_retention_days: Remote data retention days (0 = unlimited)
+        pull_enabled: Enable auto-pull on startup
+        pull_days: Pull last N days of data
+        timezone: Timezone config (default: America/New_York)
+        force_new: Force create new instance
 
     Returns:
-        StorageManager 实例
+        StorageManager instance
     """
     global _storage_manager
 
